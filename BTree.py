@@ -1,16 +1,14 @@
-#!/usb/bin/python3
+#!/usr/bin/python3
 import bisect
 
-class BTree:
-    MAX_CHILDREN = 33
-    MAX_VALUES = MAX_CHILDREN - 1
-
-g_root = None
 
 class BTreeNode:
-    def __init__(self, values=[], children=None):
+    def __init__(self, values=None, children=None):
         self.parent = None
-        self.values = values
+        if values is None:
+            self.values = []
+        else:
+            self.values = values
         self.children = children
         # make sure the children have the correct parent
         if self.children:
@@ -18,13 +16,11 @@ class BTreeNode:
                 i.parent = self
 
     def __repr__(self):
-        return 'BTreeNode(%s, %s, %r%s, %r%s)' % (
-                hex(id(self)),
-                hex(id(self.parent)) if self.parent else 'None',
-                self.values[0:5],
-                '' if len(self.values) <= 5 else ('\b... (%s values)' % len(self.values)),
-                self.children[0:3] if self.children else None,
-                '' if (not self.children or len(self.children) <= 3) else ('... %s values' % len(self.children)))
+        return 'BTreeNode(%x, %x, %r, %r)' % (
+                id(self),
+                id(self.parent),
+                self.values,
+                self.children)
 
     """
     Get the number of values in this node. This is the same
@@ -55,36 +51,28 @@ class BTreeNode:
             return (False, self, i)
 
     """
-    return True if the add succeeded or False if the key
-    already exists
+    return the new root if it changed, otherwise return none
     """
-    def add(self, val, childNodes=None):
-        if childNodes is None:
-            found, node, slot = self.search(val)
-            if found:
-                # we don't allow duplicates
-                return False
-        else:
-            assert(len(childNodes) == 2)
-            node, slot = self, bisect.bisect_left(
-                                        self.values, val)
-
-
+    def _add(self, tree, val, slot=None, childNodes=None):
         # all insertions should start at a leaf node,
         # unless we call add as a result of node spliting
         # when we are adding the median value to the parent
-        assert(node.children is None or childNodes)
+        assert(self.children is None or childNodes)
+        
+        if slot is None:
+            slot = bisect.bisect_left(self.values, val)
 
-        if node.values_count() < BTree.MAX_VALUES:
-            node.values.insert(slot, val)
-            if node.children:
+        if self.values_count() < tree.max_values:
+            self.values.insert(slot, val)
+            tree.size += 1
+            if childNodes:
                 # update the parent reference in the nodes we are about to add
                 for i in childNodes:
-                    i.parent = node
-                node.children[slot:slot + 1] = childNodes
+                    i.parent = self
+                self.children[slot:slot + 1] = childNodes
         else:
             # get the median of val and slots
-            vl = node.values[:]
+            vl = self.values[:]
             vl.insert(slot, val)
             if len(vl) % 2 == 1:
                 medianIdx = (len(vl) // 2)
@@ -92,8 +80,8 @@ class BTreeNode:
                 medianIdx = (len(vl) // 2) - 1
             median = vl[medianIdx]
             cl = None
-            if node.children:
-                cl = node.children[:]
+            if childNodes:
+                cl = self.children[:]
                 cl[slot:slot + 1] = childNodes
 
             # construct new left node
@@ -109,43 +97,57 @@ class BTreeNode:
                 cl2 = cl[medianIdx + 1:]
             rightNode = BTreeNode(vl2, cl2)
 
-            if node.parent:  # TODO: is the parent preserved ???
-                node.parent.add(median, (leftNode, rightNode))
+            if self.parent:
+                self.parent._add(tree, median, None, (leftNode, rightNode))
             else:
                 # create new root and increment the tree depth
                 newParent = BTreeNode([ median ], [leftNode, rightNode])
                 leftNode.parent = newParent
                 rightNode.parent = newParent
+                tree.root = newParent
+                tree.height += 1
+                tree.size += 1
 
-                global g_root
-                g_root = newParent
 
-        return True
+class BTree:
+    
+    def __init__(self, max_values=2):
+        self.root = BTreeNode()
+        self.max_values = max_values
+        self.height = 1
+        self.size = 0
+        
+    def __repr__(self):
+        return '%d %d %d %x' % (self.height, self.size,
+                                self.max_values,
+                                id(self.root))
+
+    def search(self, val):
+        return self.root.search(val)[0]
+
+    def add(self, val):
+        # find the leaf node where the value should be added
+        found, node, slot = self.root.search(val)
+        if found:
+            # the value already exists, can't add it twice
+            return False
+        node._add(self, val, slot, None)
 
 
 def btree_test():
-    global g_root
-    g_root = BTreeNode()
+    tree = BTree(4)
     # for i in range(15, 0, -1):
     # for i in [5, 3, 21, 9, 1, 13, 2, 7, 10, 12, 4, 8]:
-    for i in range(0, 10000):
+    for i in range(1, 16):
         print("insert: %s" % i)
-        g_root.add(i)
-        print('%r' % (g_root))
+        tree.add(i)
+        print('%r\n%r' % (tree, tree.root))
     print("-------")
-    g_root.search(77799)
-    for i in range(0, 10000):
-        if not g_root.search(i)[0]:
+    tree.search(77799)
+    for i in range(1, 16):
+        if not tree.search(i):
             raise
     print("Done.")
-        
-#     root = root.add(6)
-#     root = root.add(2)
-#     root = root.add(4)
-#     root = root.add(8)
-#     root = root.add(0)
-#     root = root.add(5)
-    # print('%r' % (g_root))
 
 btree_test()
 
