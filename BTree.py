@@ -1,4 +1,15 @@
 #!/usr/bin/python3
+
+# BTree - didactical B-Tree implementation in Python
+#         it also includes an algorithm to delete values from the
+#         B-Tree. It was inspired by this wiki article:
+#         https://en.wikipedia.org/wiki/Btree
+#         Searching within nodes is done using binary search 
+#         (through the bisect module).
+# @copyright: Copyright (c) 2014 Robert Zavalczki, distributed
+# under the terms and conditions of the Lesser GNU General 
+# Public License version 2.1
+
 import bisect
 
 
@@ -14,13 +25,6 @@ class BTreeNode:
         if self.children:
             for i in self.children:
                 i.parent = self
-
-    def __repr__(self):
-        return 'BTreeNode(%x, %x, %r, %r)' % (
-                id(self),
-                id(self.parent),
-                self.values,
-                self.children)
 
     def __str__(self):
         return 'Node(%x, %x, %r, %d)' % (
@@ -77,9 +81,9 @@ class BTreeNode:
     """
     add a new value to the B-Tree, the value must not already exist
     """
-    def _add(self, tree, val, slot=None, childNodes=None):
+    def add(self, tree, val, slot=None, childNodes=None):
         # all insertions should start at a leaf node,
-        # unless we call _add recursively into the parent
+        # unless we call add recursively into the parent
         # as a result of node splitting
         # when we are adding the median value to the parent
         assert(self.children is None or childNodes)
@@ -158,7 +162,7 @@ class BTreeNode:
         rightNode = BTreeNode(rv, rc)
 
         if self.parent:
-            return self.parent._add(tree,
+            return self.parent.add(tree,
                                     medianVal,
                                     None,
                                     (leftNode, rightNode))
@@ -189,7 +193,7 @@ class BTreeNode:
     """
     delete a value from the B-Tree, the value must exist
     """
-    def _delete(self, tree, val, slot=None):
+    def delete(self, tree, val, slot=None):
 
         innerNode = self.children is not None        
         if slot is None:
@@ -319,17 +323,18 @@ class BTreeNode:
 
 class BTree:
     
-    def __init__(self, max_values=2):
+    def __init__(self, max_values):
         self.root = BTreeNode()
         self.max_values = max_values
         self.min_values = max_values // 2
         self.height = 1
         self.size = 0
         
-    def __repr__(self):
-        return '%d %d %d %x' % (self.height, self.size,
-                                self.max_values,
-                                id(self.root))
+    def __str__(self):
+        return 'height: %d nodes: %d m: %d root: %x' % (
+                                    self.height, self.size,
+                                    self.max_values + 1,
+                                    id(self.root))
 
     def add(self, val):
         # find the leaf node where the value should be added
@@ -337,7 +342,7 @@ class BTree:
         if found:
             # the value already exists, can't add it twice
             return False
-        return node._add(self, val, slot, None)
+        return node.add(self, val, slot, None)
 
     def delete(self, val):
         # find the value and its
@@ -346,7 +351,7 @@ class BTree:
             # the value doesn't exist, can't delete it
             return False
 
-        return node._delete(self, val, slot)
+        return node.delete(self, val, slot)
 
 
     def search(self, val):
@@ -375,8 +380,7 @@ def check_tree(tree, values):
 
 
 def btree_test():
-    tree = BTree(4)
-
+    tree = BTree(3)
     values = [i for i in range(1, 36, 2)]
     values.extend([i for i in range(10, 20, 2)])
     print(values)
@@ -385,14 +389,15 @@ def btree_test():
         tree.add(i)
         tree.root.check_valid()
     
+    print(tree)
     tree.root.pretty_print()     
     print("-------")
 
     for i in values[:]:
         tree.delete(i)
         tree.root.check_valid()
-        tree.root.pretty_print()
-        print("-------")
+        # tree.root.pretty_print()
+        # print("-------")
         values.remove(i)
         check_tree(tree, values)
 
