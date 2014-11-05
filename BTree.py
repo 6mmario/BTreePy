@@ -409,108 +409,19 @@ class BTree(object):
         return self.root.max_value()[0]
     
 
-
-def check_tree(tree, values):
-    for i in values:
-        assert(tree.search(i))
-
-    if values:
-        assert(not tree.search(min(values) - 1))
-        assert(not tree.search(max(values) + 1))
-
-    if tree.size and values:
-        assert(tree.min() == min(values))
-        assert(tree.max() == max(values))
-
-def btree_test():
-    tree = BTree(3)
-    values = [i for i in range(1, 36, 2)]
-    values.extend([i for i in range(100, 200, 13)])
-    values.extend([i for i in range(10, 20, 2)])
-    values.extend([i for i in range(119, 200, 17)])
-    print(values)
-
-    for i in values:
-        print('adding: %s ...' % (i))
+if __name__ == '__main__':
+    tree = BTree(2)
+    for i in range(1, 8):
         tree.add(i)
-        tree.root.pretty_print()
-        print("-------")  
-        tree.root.check_valid(tree)
+        assert(tree.search(i))
+    for i in range(1, 8):
+        assert(tree.search(i))
+        
+    print("B-tree containing values 1..7")
+    tree.root.pretty_print()
+    print("-------")  
+    tree.root.check_valid(tree)
     
-    print(tree)
-    tree.root.pretty_print()     
-    print("-------")
-
-    for i in values[:]:
-        print('removing: %s ...' % (i))
+    for i in range(1, 8):
         tree.delete(i)
-        tree.root.pretty_print()
-        print("-------")
         tree.root.check_valid(tree)
-        values.remove(i)
-        check_tree(tree, values)
-
-    print("Done.")
-
-
-# btree_test()
-
-import random
-
-def rand_test(max_values=3, count=11, seed=None):
-    if seed is None:
-        random.seed(17)
-    else:
-        random.seed(int(seed))
-
-    n = max_values  # random.randint(4, 16)
-    tree = BTree(n)
-    n = count  # random.randint(1, 360)
-    print("test values: %d" % (count))
-    
-    values = [random.randint(1000, 9999) for i in range(0, n)]
-    # values = [4444, 3625, 1391, 9257, 5453, 9803, 4565, 3270, 7259, 2904, 3447, 7400, 5966, 5882]
-    print(values)
-
-    for i in values[:]:
-        # print('adding: %s ...' % (i))
-        if not tree.add(i):
-            # print('duplicate: %s ...' % (i))
-            values.remove(i)
-        # print(tree)
-        # tree.root.pretty_print()
-        # print("-------")  
-        tree.root.check_valid(tree)
-    
-    print(tree)
-    tree.root.pretty_print()     
-    print("-------")
-
-    random.shuffle(values)
-    for i in values[:]:
-        # print('removing: %s ...' % (i))
-        tree.delete(i)
-        # tree.root.pretty_print()
-        # print("-------")
-        tree.root.check_valid(tree)
-        values.remove(i)
-        check_tree(tree, values)
-
-    print("Done.")
-
-
-# rand_test(3, 19, 120804)
-
-if 1:
-    mini = 99999
-    for seed in range(120859, 120869):
-        for i in range(99, 150):
-            try:
-                rand_test(19, i, seed)
-            except:
-                print("i: %d min: %d seed: %d" % (i, mini, seed))
-                if i < mini:
-                    mini = i
-                    raise
-                raise
-                break
