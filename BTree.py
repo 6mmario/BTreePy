@@ -1,9 +1,9 @@
 #!/usr/bin/python3
 
-# BTree - B-Tree implementation in Python for didactic purposes.
+# BTree - B-tree implementation in Python for didactic purposes.
 #
 # It includes algorithms to add, search and delete values from 
-# the B-Tree. It was inspired by this Wikipedia article:
+# the B-tree. It was inspired by this Wikipedia article:
 #         https://en.wikipedia.org/wiki/Btree
 # Searching within nodes is done using binary search (using 
 # the bisect module).
@@ -14,7 +14,12 @@
 
 import bisect
 
-
+""" A B-tree node is a concrete class. It holds an ordered list 
+    of values and - in case of inner nodes - the list of the 
+    corresponding BTreeNode children which are separated by 
+    those values. The parent member references the parent node
+    or None in the case of the root node.
+"""
 class BTreeNode(object):
     def __init__(self, values=None, children=None):
         self.parent = None
@@ -42,11 +47,12 @@ class BTreeNode(object):
             for i in self.children:
                 i.pretty_print(tab + '   ')
 
-    # to check algorithms correctness
+    """ Check (recursively) tree integrity according to the B-tree rules. 
+        This is used to check the correctness of algorithms.
+    """
     def check_valid(self, tree):
         innerNode = self.children is not None
         rootNode = self.parent is None
-        # print(self)
 
         assert(self.values is not None)
 
@@ -64,15 +70,13 @@ class BTreeNode(object):
         # A non-leaf node with k children contains k-1 keys.
         if innerNode:
             assert((len(self.values) + 1) == len(self.children))
-            
+        
+        # check that values are sorted
         prev = None
         for i in self.values:
             if prev is not None:
                 assert(i > prev)
             prev = i
-            
-        assert(self.children is None or 
-               (len(self.values) + 1) == len(self.children))
 
         if self.children:
             for i in self.children:
@@ -104,10 +108,65 @@ class BTreeNode(object):
             return self.children[i].search(val)
         else:
             return (False, self, i)
+
+    """ Split a B-tree node in two.
+    
+        If val and slot are given then also insert val into the
+        resulting nodes. If additionally childNodes is given 
+        then _split_node is recursively called from add and
+        childNodes represent the nodes separated by the value val
+        in this node's parent.
+    """    
+    def _split_node(self, tree, val=None, slot=None, childNodes=None):
+        assert(val is None or (slot is not None))
+
+        midList = [] if val is None else [ val ]
+        if slot is None:
+            slot = 0
+
+        # get the median of self.values and val
+        splitValues = self.values[0:slot] + midList + self.values[slot:]
+        medianIdx = len(splitValues) // 2
+        
+        lv = splitValues[0:medianIdx]
+        medianVal = splitValues[medianIdx]
+        rv = splitValues[medianIdx + 1:]
+        
+        innerNode = self.children is not None
+
+        if innerNode:
+            if childNodes is not None:
+                splitChildren = (self.children[0:slot] + 
+                                 list(childNodes) + 
+                                 self.children[slot + 1:])
+            else:
+                splitChildren = self.children
+            lc = splitChildren[0:len(lv) + 1]
+            rc = splitChildren[len(lv) + 1:]
+        else:
+            lc = None
+            rc = None
+
+        leftNode = BTreeNode(lv, lc)
+        rightNode = BTreeNode(rv, rc)
+
+        if self.parent:
+            self.parent.add(tree,
+                            medianVal,
+                            None,
+                            (leftNode, rightNode))
+        else:
+            # create new root and increment the tree depth
+            newRoot = BTreeNode([ medianVal ], [leftNode, rightNode])
+            leftNode.parent = newRoot
+            rightNode.parent = newRoot
+            tree.root = newRoot
+            tree.height += 1
+            tree.size += 1
         
 
     """
-    Add a new value to the B-Tree 'tree'.
+    Add a new value to the B-tree 'tree'.
     
     The value must not already exist.
     """
@@ -147,39 +206,7 @@ class BTreeNode(object):
             return True
         
         # it seems the current node is full, we have to split it
-        # get the median of self.values and val
-        
-        splitValues = self.values[0:slot] + [ val ] + self.values[slot:]
-        medianIdx = len(splitValues) // 2
-        
-        lv = splitValues[0:medianIdx]
-        medianVal = splitValues[medianIdx]
-        rv = splitValues[medianIdx + 1:]
-
-        if innerNode:
-            splitChildren = self.children[0:slot] + list(childNodes) + self.children[slot + 1:]
-            lc = splitChildren[0:len(lv) + 1]
-            rc = splitChildren[len(lv) + 1:]
-        else:
-            lc = None
-            rc = None
-
-        leftNode = BTreeNode(lv, lc)
-        rightNode = BTreeNode(rv, rc)
-
-        if self.parent:
-            return self.parent.add(tree,
-                                   medianVal,
-                                   None,
-                                   (leftNode, rightNode))
-
-        # create new root and increment the tree depth
-        newRoot = BTreeNode([ medianVal ], [leftNode, rightNode])
-        leftNode.parent = newRoot
-        rightNode.parent = newRoot
-        tree.root = newRoot
-        tree.height += 1
-        tree.size += 1
+        self._split_node(tree, val, slot, childNodes)
         return True
 
 
@@ -197,7 +224,8 @@ class BTreeNode(object):
 
 
     """
-    delete a value from the B-Tree, the value must exist
+    Delete a value from the B-tree.
+    The value must exist.
     """
     def delete(self, tree, val, slot=None):
 
@@ -226,15 +254,17 @@ class BTreeNode(object):
             if len(node.values) < tree.min_values:
                 node._rebalance(tree)
 
+    """ Rebalance a B-tree starting with the current node.
+    """
     def _rebalance(self, tree):
         lsibling, rsibling, idx = self.get_siblings()
         
         # only the root doesn't have siblings
-        # print('rebalance: %s <- %s -> %s' % (lsibling, self, rsibling))
         assert(rsibling or lsibling or self.parent is None)
 
         if self.parent is None:
-            return False  # ???
+            # this is a no-op for the root node
+            return
 
         innerNode = self.children is not None
         if innerNode:
@@ -252,7 +282,7 @@ class BTreeNode(object):
                 self.parent.values[sepIdx] = rsibling.values[0]
                 del rsibling.values[0]
                 self.values.append(sepVal)
-                return True
+                return
             elif lsibling and len(lsibling.values) > tree.min_values:
                 sepIdx = idx - 1
                 sepVal = self.parent.values[sepIdx]
@@ -260,8 +290,8 @@ class BTreeNode(object):
                 self.parent.values[sepIdx] = lsibling.values[-1]
                 del lsibling.values[-1]
                 self.values.insert(0, sepVal)
-                return True
-        
+                return
+
         # we have to merge 2 nodes
         if lsibling is not None:
             sepIdx = idx - 1
@@ -275,7 +305,7 @@ class BTreeNode(object):
             assert(False)
         
         sepVal = self.parent.values[sepIdx]
-        
+
         ln.values.append(sepVal)
         ln.values.extend(rn.values)
         del rn.values[:]
@@ -287,22 +317,27 @@ class BTreeNode(object):
             for i in rn.children:
                 i.parent = ln
 
+        if len(ln.values) > tree.max_values:
+            # we have to split the newly formed node
+            # this situation can aris only when merging inner nodes
+            assert(innerNode)
+            ln._split_node(tree)
+
+        if len(self.parent.values) < tree.min_values:
+            # rebalance the parent
+            self.parent._rebalance(tree)            
+
         if self.parent.parent is None and not self.parent.values:
             tree.root = ln
             tree.root.parent = None
-            return True
-        
-        if len(self.parent.values) < tree.min_values:
-            # rebalance the parent
-            self.parent._rebalance(tree)
-            # raise Exception('Implement me!!!')
-         
 
-    
-    """
-    return the tupple: 
-    (left sibiling node, right sibling node, separator index)
-    If a sibling does not exist, None is returned
+    """ Get the adjacent siblings of this node.
+     
+    Return the tupple:
+    (left sibiling node, right sibling node, separator index).
+    If a sibling does not exist, None is returned instead. The 
+    separator index represents the index of this node in its 
+    parent's children list.
     """
     def get_siblings(self):
         if not self.parent:
@@ -326,12 +361,16 @@ class BTreeNode(object):
 
         return (lsibling, rsibling, idx)
 
-
+""" B-tree implementation operating on BTreeNode-s.
+    
+    It implements the interface for constructing, editing and 
+    searching in B-trees.
+"""
 class BTree(object):
     
     def __init__(self, max_values):
-        if max_values <= 2:
-            raise ValueError("B-Tree max_values count per node must be at least 3")
+        if max_values <= 1:
+            raise ValueError("B-tree max_values count per node must be at least 2")
         self.root = BTreeNode()
         self.max_values = max_values
         self.min_values = max_values // 2
@@ -358,9 +397,7 @@ class BTree(object):
         if not found:
             # the value doesn't exist, can't delete it
             return False
-
         return node.delete(self, val, slot)
-
 
     def search(self, val):
         return self.root.search(val)[0]
@@ -431,32 +468,30 @@ def rand_test(max_values=3, count=11, seed=None):
     n = count  # random.randint(1, 360)
     print("test values: %d" % (count))
     
-    values = [random.randint(100, 999) for i in range(0, n)]
-    # values = [896, 539, 785, 878, 201, 503, 461, 164, 579, 269, 647, 547, 233, 327, 787, 346, 472]
-    # values = [803, 172, 885, 616, 541, 218, 818, 386, 815, 860, 187, 994, 269, 338, 613, 731, 328, 892, 986, 304]
-    # values = [911, 742, 410, 196, 835, 867, 714, 328, 775, 816, 676, 796, 184, 975, 499, 721, 994, 501]
-    # values = [503, 452, 584, 334, 892, 579, 183, 100, 114, 419, 403, 171, 648, 558, 340, 829, 104, 368, 126, 718, 251]
+    values = [random.randint(1000, 9999) for i in range(0, n)]
+    # values = [4444, 3625, 1391, 9257, 5453, 9803, 4565, 3270, 7259, 2904, 3447, 7400, 5966, 5882]
     print(values)
 
     for i in values[:]:
-        print('adding: %s ...' % (i))
+        # print('adding: %s ...' % (i))
         if not tree.add(i):
-            print('duplicate: %s ...' % (i))
+            # print('duplicate: %s ...' % (i))
             values.remove(i)
-        print(tree)
-        tree.root.pretty_print()
-        print("-------")  
+        # print(tree)
+        # tree.root.pretty_print()
+        # print("-------")  
         tree.root.check_valid(tree)
     
     print(tree)
     tree.root.pretty_print()     
     print("-------")
 
+    random.shuffle(values)
     for i in values[:]:
-        print('removing: %s ...' % (i))
+        # print('removing: %s ...' % (i))
         tree.delete(i)
-        tree.root.pretty_print()
-        print("-------")
+        # tree.root.pretty_print()
+        # print("-------")
         tree.root.check_valid(tree)
         values.remove(i)
         check_tree(tree, values)
@@ -464,14 +499,14 @@ def rand_test(max_values=3, count=11, seed=None):
     print("Done.")
 
 
-rand_test(4, 19, 120804)
+# rand_test(3, 19, 120804)
 
 if 1:
     mini = 99999
-    for seed in range(120820, 120830):
-        for i in range(10, 50):
+    for seed in range(120859, 120869):
+        for i in range(99, 150):
             try:
-                rand_test(4, i, seed)
+                rand_test(19, i, seed)
             except:
                 print("i: %d min: %d seed: %d" % (i, mini, seed))
                 if i < mini:
