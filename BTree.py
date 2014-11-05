@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/python
 
 # BTree - B-tree implementation in Python for didactic purposes.
 #
