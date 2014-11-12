@@ -29,8 +29,8 @@ class BTreeTest(unittest.TestCase):
             self.assertTrue(tree.min() == min(values))
             self.assertTrue(tree.max() == max(values))
 
-    def fixed_test_1(self, node_max_vals, node_values=None):
-        tree = BTree.BTree(node_max_vals)
+    def fixed_test_1(self, order, node_values=None):
+        tree = BTree.BTree(order)
         if node_values is None:
             values = [i for i in range(1, 36, 2)]
             values.extend([i for i in range(100, 200, 13)])
@@ -39,93 +39,58 @@ class BTreeTest(unittest.TestCase):
         else:
             values = node_values
 
-        # print(values)
         for i in values:
-            # print('adding: %s ...' % (i))
-            tree.add(i)
-            # tree.root.pretty_print()
-            # print("-------")  
+            tree.add(i)  
             tree.root.check_valid(tree)
-        
-        # print(tree)
-        # tree.root.pretty_print()     
-        # print("-------")
-    
+
         for i in values[:]:
-            # print('removing: %s ...' % (i))
             tree.delete(i)
-            # tree.root.pretty_print()
-            # print("-------")
             tree.root.check_valid(tree)
             values.remove(i)
             self.check_tree(tree, values)
-        # print("Done.")
 
-    def rand_test(self, max_values=3, count=11, seed=None):
-        if seed is None:
-            random.seed(17)
-        else:
-            random.seed(int(seed))
-    
-        n = max_values
-        tree = BTree.BTree(n)
-        n = count  # random.randint(1, 360)
-        # print("test values: %d" % (count))
-        
-        values = [random.randint(1000, 9999) for i in range(0, n)]
-        # print(values)
+    def rand_test(self, order, count, seed=None):
+        random.seed(seed or 17)
+        tree = BTree.BTree(order)        
+        values = [random.randint(1000, 9999) for i in range(0, count)]
 
         for i in values[:]:
-            # print('adding: %s ...' % (i))
             if not tree.add(i):
-                # print('duplicate: %s ...' % (i))
-                values.remove(i)
-            # print(tree)
-            # tree.root.pretty_print()
-            # print("-------")  
+                values.remove(i)  
             tree.root.check_valid(tree)
-        
-        # print(tree)
-        # tree.root.pretty_print()     
-        # print("-------")
-    
+
         random.shuffle(values)
         for i in values[:]:
-            # print('removing: %s ...' % (i))
             tree.delete(i)
-            # tree.root.pretty_print()
-            # print("-------")
             tree.root.check_valid(tree)
             values.remove(i)
             self.check_tree(tree, values)
-    
-        # print("Done.")
 
     def test_fixed_size2(self):
-        self.fixed_test_1(2)
+        self.fixed_test_1(3)
 
     def test_fixed_size3(self):
-        self.fixed_test_1(3)
+        self.fixed_test_1(4)
         lst = [4444, 3625, 1391, 9257, 5453, 9803, 4565, 
                3270, 7259, 2904, 3447, 7400, 5966, 5882]
-        self.fixed_test_1(3, lst) 
+        self.fixed_test_1(4, lst) 
 
     def test_fixed_size4(self):
-        self.fixed_test_1(4)
+        self.fixed_test_1(5)
 
     def test_rand1(self):
         for seed in range(120000, 120002):
             for i in range(97, 101):
-                self.rand_test(3, i, seed)
+                self.rand_test(4, i, seed)
 
     def test_rand2(self):
         for seed in range(120000, 120002):
             for i in range(97, 101):
-                self.rand_test(4, i, seed)
+                self.rand_test(5, i, seed)
 
 
     def test_small(self):
-        tree = BTree.BTree(2)
+        tree = BTree.BTree(3)
         for i in range(1, 8):
             tree.add(i)
             assert(tree.search(i))

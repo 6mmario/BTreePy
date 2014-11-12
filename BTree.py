@@ -16,17 +16,14 @@ import bisect
 
 """ A B-tree node is a concrete class. It holds an ordered list 
     of values and - in case of inner nodes - the list of the 
-    corresponding BTreeNode children which are separated by 
+    corresponding _BTreeNode children which are separated by 
     those values. The parent member references the parent node
     or None in the case of the root node.
 """
-class BTreeNode(object):
+class _BTreeNode(object):
     def __init__(self, values=None, children=None):
         self.parent = None
-        if values is None:
-            self.values = []
-        else:
-            self.values = values
+        self.values = values or []
         self.children = children
         # update the parent node in children, 
         # just in case it has changed
@@ -147,8 +144,8 @@ class BTreeNode(object):
             lc = None
             rc = None
 
-        leftNode = BTreeNode(lv, lc)
-        rightNode = BTreeNode(rv, rc)
+        leftNode = _BTreeNode(lv, lc)
+        rightNode = _BTreeNode(rv, rc)
 
         if self.parent:
             self.parent.add(tree,
@@ -157,7 +154,7 @@ class BTreeNode(object):
                             (leftNode, rightNode))
         else:
             # create new root and increment the tree depth
-            newRoot = BTreeNode([ medianVal ], [leftNode, rightNode])
+            newRoot = _BTreeNode([ medianVal ], [leftNode, rightNode])
             leftNode.parent = newRoot
             rightNode.parent = newRoot
             tree.root = newRoot
@@ -361,19 +358,25 @@ class BTreeNode(object):
 
         return (lsibling, rsibling, idx)
 
-""" B-tree implementation operating on BTreeNode-s.
+""" B-tree implementation operating on _BTreeNode-s.
     
     It implements the interface for constructing, editing and 
     searching in B-trees.
 """
 class BTree(object):
-    
-    def __init__(self, max_values):
-        if max_values <= 1:
-            raise ValueError("B-tree max_values count per node must be at least 2")
-        self.root = BTreeNode()
-        self.max_values = max_values
-        self.min_values = max_values // 2
+    """ Create a B-tree of a given order. The order is 
+        interpreted as the maximum number of children per node,
+        which is the maximum number of keys per node plus one.
+        See: Knuth, Donald, Sorting and Searching, The Art of 
+        Computer Programming, Volume 3 p. 483. 
+    """
+    def __init__(self, order):
+        if order <= 2:
+            raise ValueError("B-tree order must be at least 3")
+        self.root = _BTreeNode()
+        self.order = order
+        self.max_values = order - 1
+        self.min_values = self.max_values // 2
         self.height = 1
         self.size = 0
         
@@ -410,7 +413,8 @@ class BTree(object):
     
 
 if __name__ == '__main__':
-    tree = BTree(2)
+    # mini test
+    tree = BTree(3)
     for i in range(1, 8):
         tree.add(i)
         assert(tree.search(i))
